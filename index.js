@@ -41,41 +41,34 @@ app.use(morgan('tiny'))
 app.use(morgan(':body'))
 
 app.get('/info', (request, response) => {
-  response.send(`<p>Phonebook has info for ${persons.length} people</p>
-                 <p>${new Date()}</p>`)
+  Person.find({})
+    .then(persons => {
+      response.send(`<p>Phonebook has info for ${persons.length} people</p>
+      <p>${new Date()}</p>`)
+    })
 })
 
 app.get('/api/persons', (request, response) => {
   Person.find({}).then(persons => {
-    response.json(persons)
+    response.json(persons.map(person => person.toJSON()))
   })
 })
 
-app.get('/api/persons/:id', (request, response) => {
-  const id = Number(request.params.id)
-  person = persons.find(person => person.id === id)
-
-  if(person){
-    response.json(person)
-  } else {
-    return response.status(404).end()
-  }
+app.get('/api/persons/:id', (request, response, next) => {
+  Person.findById(request.params.id)
+    .then(foundPerson => {
+      response.json(foundPerson.toJSON())
+    })
+    .catch(error => next(error))
 })
 
-app.delete('/api/persons/:id', (request, response) => {
-  const id = Number(request.params.id)
-  persons = persons.filter(person => person.id !== id)
-
-  response.status(204).end()
+app.delete('/api/persons/:id', (request, response, next) => {
+  Person.findByIdAndRemove(request.params.id)
+    .then(result => {
+      response.status(204).end()
+    })
+    .catch(error => next(error))
 })
-
-const generateId = () => {
-  const maxId = persons.length > 0
-    ? Math.max(...persons.map(p => p.id))
-    : 0
-
-  return maxId + 1
-}
 
 app.post('/api/persons', (request, response) => {
   const body = request.body;
@@ -95,10 +88,38 @@ app.post('/api/persons', (request, response) => {
     number: body.number
   })
 
-  Person.create(newPerson).then(createdPerson => {
-    response.json(createdPerson)
+  newPerson.save().then(savedPerson => {
+    response.json(savedPerson.toJSON())
   })
 })
+
+app.put('/api/persons/:id', (request, response, next) => {
+  const body = request.body
+
+  const person = {
+    name: body.name,
+    number: body.number
+  }
+
+  Person.findByIdAndUpdate(request.params.id, person, { new: true})
+    .then(updatedPerson => {
+      response.json(updatedPerson.toJSON())
+    })
+    .catch(error => next(error))
+})
+
+const errorHandler = (error, request, response, next) => {
+  console.error(error.message)
+  console.log("THIS IS INSIDE ERROR HANDLER");
+
+  if(error.name === "CastError"){
+    return response.status(400).send({ error: 'malformatted id' })
+  }
+
+  next(error)
+}
+
+app.use(errorHandler)
 
 const PORT = process.env.PORT
 app.listen(PORT, () => {
