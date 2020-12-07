@@ -1,7 +1,7 @@
-POST https://protected-eyrie-55073.herokuapp.com/api/persons
+PUT http://localhost:3001/api/persons/5fcd14f67cc8f30b6c6eba38
 Content-Type: application/json
 
 {
   "name": "Bill",
-  "number": "123"
+  "number": "188777778888999"
 }

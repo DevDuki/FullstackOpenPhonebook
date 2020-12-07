@@ -3,6 +3,7 @@ const express = require('express')
 const morgan = require('morgan')
 const cors = require('cors')
 const Person = require('./models/person')
+const { query } = require('express')
 
 const app = express()
 
@@ -70,27 +71,30 @@ app.delete('/api/persons/:id', (request, response, next) => {
     .catch(error => next(error))
 })
 
-app.post('/api/persons', (request, response) => {
+app.post('/api/persons', (request, response, next) => {
   const body = request.body;
 
-  if(!body.name || !body.number){
-    return response.status(400).json({
-      error: 'name or number is missing'
-    })
-  } else if(persons.some(person => person.name === body.name)){
-    return response.status(400).json({
-      error: `${body.name} already exists in the phonebook`
-    })
-  }
+  // if(!body.name || !body.number){
+  //   return response.status(400).json({
+  //     error: 'name or number is missing'
+  //   })
+  // } else if(persons.some(person => person.name === body.name)){
+  //   return response.status(400).json({
+  //     error: `${body.name} already exists in the phonebook`
+  //   })
+  // }
 
   const newPerson = new Person({
     name: body.name,
     number: body.number
   })
 
-  newPerson.save().then(savedPerson => {
-    response.json(savedPerson.toJSON())
-  })
+  newPerson.save()
+    .then(savedPerson => savedPerson.toJSON())
+    .then(savedAndFormattedPerson => {
+      response.json(savedAndFormattedPerson)
+    })
+    .catch(error => next(error))
 })
 
 app.put('/api/persons/:id', (request, response, next) => {
@@ -101,7 +105,7 @@ app.put('/api/persons/:id', (request, response, next) => {
     number: body.number
   }
 
-  Person.findByIdAndUpdate(request.params.id, person, { new: true})
+  Person.findByIdAndUpdate(request.params.id, person, { new: true, runValidators: true, context: 'query' })
     .then(updatedPerson => {
       response.json(updatedPerson.toJSON())
     })
@@ -109,11 +113,13 @@ app.put('/api/persons/:id', (request, response, next) => {
 })
 
 const errorHandler = (error, request, response, next) => {
-  console.error(error.message)
   console.log("THIS IS INSIDE ERROR HANDLER");
+  console.error(error.message)
 
   if(error.name === "CastError"){
     return response.status(400).send({ error: 'malformatted id' })
+  } else if(error.name === "ValidationError"){
+    return response.status(400).send({ error: error.message })
   }
 
   next(error)
